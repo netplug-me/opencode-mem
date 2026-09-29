@@ -239,7 +239,14 @@ export function toLegacyEvent(raw: any): { type: string; properties: any } {
   const envelope = raw?.payload ?? raw;
   const source = envelope?.type === "sync" && envelope.syncEvent ? envelope.syncEvent : envelope;
   const rawType = typeof source?.type === "string" ? source.type.replace(/\.1$/, "") : source?.type;
-  const type = rawType === "session.compaction.ended" ? "session.compacted" : rawType;
+  // v2 has no session.idle; a successfully finished execution is its equivalent
+  // and is what drives auto-capture and user-profile learning.
+  const type =
+    rawType === "session.compaction.ended"
+      ? "session.compacted"
+      : rawType === "session.execution.succeeded"
+        ? "session.idle"
+        : rawType;
   const data = source?.data ?? {};
   if (source && typeof source === "object" && "properties" in source) {
     return { type, properties: source.properties };

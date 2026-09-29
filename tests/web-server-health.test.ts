@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { createServer } from "node:http";
 import { WebServer, nextFallbackPort } from "../src/services/web-server.js";
+import { WebAuth } from "../src/services/web-auth.js";
 
 describe("web server health check", () => {
   it("authenticates the stats request when an API token is configured", async () => {
@@ -21,6 +22,33 @@ describe("web server health check", () => {
 
       expect(await server.checkServerAvailable()).toBe(true);
       expect(requestHeaders?.get("Authorization")).toBe("Bearer health-token");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("probes /api/health without a Bearer header when basic auth is enabled", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestedUrl = "";
+    let requestHeaders: Headers | undefined;
+    globalThis.fetch = async (input, init) => {
+      requestedUrl = String(input);
+      requestHeaders = new Headers(init?.headers);
+      return new Response(JSON.stringify({ success: true, status: "ok" }), { status: 200 });
+    };
+
+    try {
+      const server = new WebServer({
+        enabled: true,
+        host: "0.0.0.0",
+        port: 4747,
+        apiToken: "health-token",
+        auth: new WebAuth({ username: "user", password: "secret" }),
+      });
+
+      expect(await server.checkServerAvailable()).toBe(true);
+      expect(requestedUrl).toEndWith("/api/health");
+      expect(requestHeaders?.get("Authorization")).toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
     }

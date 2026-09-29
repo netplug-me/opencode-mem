@@ -413,10 +413,12 @@ export class WebServer {
 
   async checkServerAvailable(): Promise<boolean> {
     try {
-      const headers = this.config.apiToken
-        ? { Authorization: `Bearer ${this.config.apiToken}` }
-        : undefined;
-      const endpoint = this.config.apiToken ? "/api/stats" : "/api/health";
+      // /api/health is exempt from both the API token and HTTP basic auth. With basic
+      // auth enabled a Bearer probe of /api/stats would 401, which looks like a dead
+      // owner and makes every instance take over a neighbor port.
+      const probeStats = Boolean(this.config.apiToken) && !this.config.auth?.isEnabled();
+      const headers = probeStats ? { Authorization: `Bearer ${this.config.apiToken}` } : undefined;
+      const endpoint = probeStats ? "/api/stats" : "/api/health";
       const response = await fetch(`${this.getUrl()}${endpoint}`, {
         method: "GET",
         headers,
